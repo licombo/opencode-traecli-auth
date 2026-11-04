@@ -31,6 +31,22 @@ test("stripWarnings removes traecli path warning", () => {
   assert.equal(_internal.stripWarnings("WARNING: proceeding\n[{\"name\":\"m\"}]\n"), "[{\"name\":\"m\"}]")
 })
 
+test("maxModelConfig reads Max from the raw traecli model list", () => {
+  const max = _internal.maxModelConfig({
+    name: "GLM-5.3-FlashX",
+    context_window: 200000,
+    _meta: { trae: { supportsMaxMode: true, maxContextWindow: 1000000 } },
+  })
+  assert.equal(max.id, "GLM-5.3-FlashX-1M")
+  assert.equal(max.limit.context, 1000000)
+  assert.equal(_internal.maxModelConfig({ name: "MiniMax-M2.7", context_window: 200000, _meta: { trae: {} } }), null)
+})
+
+test("traeModelArgs sends Max as a variant, not a model id", () => {
+  assert.deepEqual(_internal.traeModelArgs("GLM-5.3-FlashX-1M"), ["-c", 'model_backend_variant="max"', "--model", "GLM-5.3-FlashX"])
+  assert.deepEqual(_internal.traeModelArgs("GLM-5.3-FlashX"), ["--model", "GLM-5.3-FlashX"])
+})
+
 test("parseJsonLines ignores non-json and maps events", async () => {
   async function* lines() {
     yield "not json"

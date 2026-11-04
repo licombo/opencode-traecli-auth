@@ -63,8 +63,10 @@ traecli models --json
 Each chat completion runs:
 
 ```sh
-traecli exec --json --skip-git-repo-check --ephemeral --ignore-rules --sandbox read-only --model <model> -
+traecli exec --json --skip-git-repo-check --ephemeral --ignore-rules --permission-mode bypass_permissions --model <model> -
 ```
+
+`traecli models --json` lists only the standard variant. Its context is usually 200K, and Max sits in `_meta.trae` (`supportsMaxMode`, `maxContextWindow`). The plugin keeps that standard model, and also publishes `<name>-1M` with `maxContextWindow` when Max is available. A request for `<name>-1M` is sent as `--model <name> -c model_backend_variant="max"`. TRAE CLI resolves that to its Max backend key. Do not write the 1M window into `traecli` config or `providers.json`; the plugin reads the raw model list.
 
 The request messages are merged into a role-tagged text prompt and written to stdin.
 
