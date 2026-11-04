@@ -1,6 +1,6 @@
 {
   "name": "@caikuner/opencode-traecli-auth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCode/Magpie provider plugin that proxies requests through the locally signed-in TRAE CLI",
   "type": "module",
   "main": "./index.mjs",

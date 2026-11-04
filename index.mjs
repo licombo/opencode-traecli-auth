@@ -94,7 +94,13 @@ function TraeCliPlugin({ client } = {}) {
           const list = JSON.parse(stripWarnings(stdout))
           if (!Array.isArray(list)) return have
           const load = modelLoads()
-          return Object.fromEntries(list.filter((m) => m?.name).map((m) => [m.name, modelConfig(m, load[m.name])]))
+          const models = {}
+          for (const m of list.filter((item) => item?.name)) {
+            models[m.name] = modelConfig(m, load[m.name])
+            const max = maxModelConfig(m, load[m.name])
+            if (max) models[max.id] = max
+          }
+          return models
         } catch {
           return have
         }
@@ -196,11 +202,45 @@ function modelConfig(m, load) {
   }
 }
 
+// traecli models lists only the standard variant. Max is the same display
+// name plus model_backend_variant=max, with the window in _meta.trae.maxContextWindow.
+function maxModelConfig(m, load) {
+  const meta = m?._meta?.trae
+  const context = Number(meta?.maxContextWindow || 0)
+  if (!meta?.supportsMaxMode || context <= 0) return null
+  const base = String(m?.name || "").trim()
+  if (!base) return null
+  const id = `${base}-1M`
+  const images = Array.isArray(m?.supported_mime_types) && m.supported_mime_types.some((x) => String(x).startsWith("image/"))
+  return {
+    id,
+    providerID: PROVIDER,
+    name: displayName(`${base} (1M)`, load),
+    description: `${base} Max, ${context} context`,
+    api: { id, url: API, npm: "@ai-sdk/openai-compatible" },
+    limit: { context, output: 0 },
+    capabilities: {
+      reasoning: true,
+      attachment: images,
+      toolcall: false,
+      input: { text: true, ...(images ? { image: true } : {}) },
+    },
+  }
+}
+
+function traeModelArgs(model) {
+  const id = String(model || "")
+  if (id.endsWith("-1M")) {
+    return ["-c", 'model_backend_variant="max"', "--model", id.slice(0, -3)]
+  }
+  return ["--model", id]
+}
+
 async function openaiFromTraeCli(req, signal) {
   const model = String(req.model || DEFAULT_MODEL)
   const prompt = promptFromMessages(req.messages)
   if (!prompt.trim()) return errorResponse(400, "messages must contain text content")
-  const args = ["exec", "--json", "--skip-git-repo-check", "--ephemeral", "--ignore-rules", "--sandbox", "read-only", "--model", model, "-"]
+  const args = ["exec", "--json", "--skip-git-repo-check", "--ephemeral", "--ignore-rules", "--permission-mode", "bypass_permissions", ...traeModelArgs(model), "-"]
   const events = parseJsonLines(runCliStream(args, { stdin: prompt, signal, timeout: EXEC_TIMEOUT_MS }))
   return openai(req, events, model)
 }
@@ -386,5 +426,5 @@ function stripWarnings(text) {
 const errorResponse = (status, message) =>
   new WebResponse(JSON.stringify({ error: { message, type: "traecli_error", code: status } }), { status, headers: { "content-type": "application/json" } })
 
-export const _internal = { promptFromMessages, contentText, eventFromTrae, usageFromTrae, stripWarnings, modelConfig, parseJsonLines, isTraeCliAuth, displayName, modelLoads, traeCliAccountId, loginCommand }
+export const _internal = { promptFromMessages, contentText, eventFromTrae, usageFromTrae, stripWarnings, modelConfig, maxModelConfig, traeModelArgs, parseJsonLines, isTraeCliAuth, displayName, modelLoads, traeCliAccountId, loginCommand }
 export default { id: PROVIDER, server: TraeCliPlugin }
